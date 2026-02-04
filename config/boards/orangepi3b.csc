@@ -5,7 +5,7 @@ BOARDFAMILY="rk35xx"
 BOARD_MAINTAINER=""
 BOOTCONFIG="orangepi-3b-rk3566_defconfig"
 BOOT_SOC="rk3566"
-KERNEL_TARGET="vendor,edge"
+KERNEL_TARGET="vendor,vendor-rt,edge"
 FULL_DESKTOP="yes"
 BOOT_LOGO="desktop"
 IMAGE_PARTITION_TABLE="gpt"
@@ -51,6 +51,30 @@ function post_family_tweaks_bsp__orangepi3b() {
 	install -m 755 $SRC/packages/bsp/rk3399/hciattach_opi $destination/usr/bin
 	install -m 755 $SRC/packages/bsp/orangepi3b/orangepi3b-sprd-bluetooth $destination/usr/bin/
 	cp $SRC/packages/bsp/orangepi3b/orangepi3b-sprd-bluetooth.service $destination/lib/systemd/system/
+
+	display_alert "$BOARD" "Applying low-latency audio and RTP tuning" "info"
+
+	mkdir -p $destination/etc/security/limits.d $destination/etc/sysctl.d $destination/etc/modprobe.d
+	cat <<'EOF' > $destination/etc/security/limits.d/95-audio-rt.conf
+@audio   -  rtprio     95
+@audio   -  memlock    unlimited
+EOF
+
+	cat <<'EOF' > $destination/etc/sysctl.d/99-audio-rt.conf
+net.core.rmem_default = 1048576
+net.core.rmem_max = 16777216
+net.core.wmem_default = 1048576
+net.core.wmem_max = 16777216
+net.core.netdev_max_backlog = 5000
+net.ipv4.udp_mem = 4096 87380 16777216
+net.ipv4.udp_rmem_min = 262144
+net.ipv4.udp_wmem_min = 262144
+kernel.sched_rt_runtime_us = -1
+EOF
+
+	cat <<'EOF' > $destination/etc/modprobe.d/alsa-lowlatency.conf
+options snd_pcm prealloc_buffer_size_kb=2048
+EOF
 
 	return 0
 }
